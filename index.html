@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Three.js App</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+		
+
+        /* Sidebar styles */
+        #sidebar {
+            position: fixed;
+            left: -300px; /* Hidden initially */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            max-height: 80vh;
+            overflow-y: auto;
+            transition: left 0.3s ease-in-out;
+			overflow-x: hidden;
+        }
+
+        /* Active class to show sidebar */
+        #sidebar.active {
+            left: 10px;
+        }
+
+        /* Button to toggle sidebar */
+        #toggleSidebar {
+            position: fixed;
+            left: 10px;
+            top: 20px;
+            background: black;
+            color: white;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 100;
+        }
+
+        /* List item toggle effect */
+        .hidden-component {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Info Box styles */
+        #infoBox {
+            display: none;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.155.0/build/three.module.js",
+                "three/examples/jsm/loaders/GLTFLoader.js": "https://unpkg.com/three@0.155.0/examples/jsm/loaders/GLTFLoader.js",
+                "three/examples/jsm/loaders/DRACOLoader.js": "https://unpkg.com/three@0.155.0/examples/jsm/loaders/DRACOLoader.js",
+                "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.155.0/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- Button to toggle sidebar -->
+    <button id="toggleSidebar">☰ Components</button>
+
+    <!-- Sidebar for components -->
+    <div id="sidebar">
+        <h3>Component List</h3>
+        <ul id="componentList"></ul>
+    </div>
+
+    <!-- Info box for object descriptions -->
+    <div id="infoBox">
+        <p id="infoText">Description goes here</p>
+        <button onclick="closeInfoBox()">Close</button>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+
+    <script>
+        document.getElementById('toggleSidebar').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+    </script>
+
+</body>
+</html>
