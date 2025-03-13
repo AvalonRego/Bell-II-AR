@@ -1,37 +1,36 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>WebXR Cube</title>
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://aframe.io; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://dpdb.webvr.rocks;">
-
-        <!-- WebXR Polyfill (CDN for wider support) -->
-        <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill/build/webxr-polyfill.min.js"></script>
-        
-        <!-- A-Frame (CDN for easier loading) -->
-        <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-
-        <script>
-            // Enable WebXR Polyfill for AR support
-            new WebXRPolyfill();
-
-            // Register A-Frame component for AR cube
-            AFRAME.registerComponent('ar-cube', {
-                init: function () {
-                    const el = this.el;
-                    el.setAttribute('geometry', { primitive: 'box' });
-                    el.setAttribute('material', { color: 'blue' });
-                    el.setAttribute('position', '0 1 -3');
-                }
-            });
-        </script>
-    </head>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>WebXR Cube</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://aframe.io https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://dpdb.webvr.rocks;">
     
-    <body>
-        <!-- A-Frame scene with AR support -->
-        <a-scene embedded arjs>
-            <a-entity ar-cube></a-entity>
-        </a-scene>
-    </body>
-</html>
+    <!-- WebXR Polyfill (CDN for wider support) -->
+    <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill/build/webxr-polyfill.min.js"></script>
+    
+    <!-- A-Frame (CDN for easier loading) -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
+    <script>
+        // Enable WebXR Polyfill for AR support
+        new WebXRPolyfill();
+
+        // Register A-Frame component for AR cube
+        AFRAME.registerComponent('ar-cube', {
+            init: function () {
+                const el = this.el;
+                el.setAttribute('geometry', { primitive: 'box' });
+                el.setAttribute('material', { color: 'blue' });
+                el.setAttribute('position', '0 1 -3');
+            }
+        });
+    </script>
+</head>
+
+<body>
+    <!-- A-Frame scene with AR support -->
+    <a-scene embedded arjs>
+        <a-entity ar-cube></a-entity>
+    </a-scene>
+</body>
+</html>
