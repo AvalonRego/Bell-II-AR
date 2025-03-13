@@ -15,6 +15,11 @@
     <!-- AR.js (for augmented reality support) -->
     <script src="https://aframe.io/releases/1.4.2/aframe-ar.js"></script>
 
+        <!-- A-Frame scene with AR support -->
+        <a-scene embedded arjs>
+            <a-entity ar-cube></a-entity>
+        </a-scene>
+
     <script>
         // Enable WebXR Polyfill for AR support
         new WebXRPolyfill();
