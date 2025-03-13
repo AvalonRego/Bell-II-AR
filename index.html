@@ -16,7 +16,6 @@
             width: 100vw;
             height: 100vh;
         }
-		
 
         /* Sidebar styles */
         #sidebar {
@@ -34,7 +33,7 @@
             max-height: 80vh;
             overflow-y: auto;
             transition: left 0.3s ease-in-out;
-			overflow-x: hidden;
+            overflow-x: hidden;
         }
 
         /* Active class to show sidebar */
@@ -101,12 +100,17 @@
     <!-- Info box for object descriptions -->
     <div id="infoBox">
         <p id="infoText">Description goes here</p>
-        <button onclick="closeInfoBox()">Close</button>
+        <button id="closeButton">Close</button>
     </div>
 
     <script type="module" src="./main.js"></script>
+    <script type="module">
+        import { closeInfoBox } from './ui.js';  // Import closeInfoBox function
 
-    <script>
+        // Add event listener for the close button
+        document.getElementById('closeButton').addEventListener('click', closeInfoBox);
+
+        // Toggle sidebar functionality
         document.getElementById('toggleSidebar').addEventListener('click', () => {
             document.getElementById('sidebar').classList.toggle('active');
         });

@@ -1,0 +1,509 @@
+File: modelLoader.js
+
+// modelLoader.js
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { scene } from './scene.js';
+import { updateZoomOnVisibilityChange } from './controls.js'; // Import the zoom update function
+
+// Load GLTF model with DRACO support
+export function loadModel(callback) {
+    const loader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://unpkg.com/three@0.155.0/examples/jsm/libs/draco/');
+    loader.setDRACOLoader(dracoLoader);
+
+    loader.load('public/BelleIIModel.gltf', (gltf) => {
+        const model = gltf.scene;
+        model.scale.set(0.001, 0.001, 0.001);
+        scene.add(model);
+
+        // Call the callback with the model
+        if (callback) callback(model);
+    }, undefined, (error) => {
+        console.error('An error occurred while loading the model', error);
+    });
+}
+
+// Function to toggle object visibility efficiently
+// modelLoader.js
+// modelLoader.js
+
+export function toggleObjectVisibility(objectName, isVisible, componentDistances) {
+    scene.traverse((child) => {
+        if (child.isMesh) {
+            let cleanedName = child.name.replace(/\d+/g, '').replace(/__+/g, '_').replace(/_$/, '');
+            if (cleanedName === objectName) {
+                child.visible = isVisible; // Toggle visibility of the object
+            }
+        }
+    });
+
+    // After visibility change, update zoom limits dynamically
+    updateZoomOnVisibilityChange(componentDistances);  // Trigger zoom adjustment based on visible components
+}
+
+
+
+
+
+File: raycaster.js
+
+// raycaster.js
+import * as THREE from 'three';
+import { scene } from './scene.js';
+import { camera } from './scene.js';
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let selectedObjects = new Set();
+
+export function setupRaycaster(descriptions) {
+    window.addEventListener('click', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        // Pre-filter scene to only check visible meshes
+        const objects = [];
+        scene.traverse((child) => {
+            if (child.isMesh && child.visible) objects.push(child); // Only consider visible meshes
+        });
+        
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(objects);
+        
+        if (intersects.length > 0) {
+            const clickedObject = intersects[0].object;
+            
+            // Check if the clicked object is already selected
+            if (selectedObjects.has(clickedObject)) {
+                // Deselect the object if it was already selected
+                selectedObjects.forEach(obj => obj.material.emissive.set(0x000000)); // Reset emissive color
+                selectedObjects.clear(); // Clear selection
+                document.getElementById('infoBox').style.display = 'none'; // Hide info box
+            } else {
+                // Deselect previous object
+                selectedObjects.forEach(obj => obj.material.emissive.set(0x000000));
+                selectedObjects.clear();
+                
+                // Select the new object
+                selectedObjects.add(clickedObject);
+                if (clickedObject.material.emissive) clickedObject.material.emissive.set(0xff0000); // Highlight in red
+                
+                let description = descriptions[Object.keys(descriptions).find(key => clickedObject.name.includes(key))] || 'No description available.';
+                document.getElementById('infoText').textContent = `Selected: ${clickedObject.name}. ${description}`;
+                document.getElementById('infoBox').style.display = 'block'; // Show info box
+            }
+        } else {
+            // If no object was clicked, deselect all and hide info box
+            selectedObjects.forEach(obj => obj.material.emissive.set(0x000000));
+            selectedObjects.clear();
+            document.getElementById('infoBox').style.display = 'none';
+        }
+    });
+}
+File: renderer.js
+
+// renderer.js
+import * as THREE from 'three';
+import { camera } from './camera.js';
+import { scene } from './scene.js';
+export const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);File: ui.js
+
+// setupUI.js
+import { controls, updateZoomLimits } from './controls.js';  // Import controls and updateZoomLimits function
+import { toggleObjectVisibility } from './modelLoader.js';
+import { camera } from './scene.js';  // Import camera to calculate distances
+import * as THREE from 'three';  // Import THREE for geometry manipulations
+
+
+export function setupUI(model) {
+    const componentList = document.getElementById('componentList');
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search Components';
+    searchInput.style.marginBottom = '10px';
+
+    // Search bar filters component list dynamically
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.toLowerCase();
+        componentList.querySelectorAll('li').forEach((li) => {
+            li.style.display = li.textContent.toLowerCase().includes(query) ? 'block' : 'none';
+        });
+    });
+    componentList.parentNode.insertBefore(searchInput, componentList);
+
+    // Collect objects and their distances
+    const componentDistances = [];
+    const uniqueNames = new Set();
+
+    model.traverse((child) => {
+        if (child.isMesh) {
+            let cleanedName = child.name.replace(/\d+/g, '').replace(/__+/g, '_').replace(/_$/, '');
+            if (!uniqueNames.has(cleanedName)) {
+                uniqueNames.add(cleanedName);
+
+                // Get geometry attributes for distance calculation
+                const geometry = child.geometry;
+                geometry.computeBoundingBox();  // Ensure bounding box is up to date
+
+                // Calculate the closest vertex to the camera using position attribute
+                const positionAttribute = geometry.attributes.position;
+                let minDistance = Infinity;
+
+                // Loop through all vertices
+                for (let i = 0; i < positionAttribute.count; i++) {
+                    const vertex = new THREE.Vector3().fromBufferAttribute(positionAttribute, i); // Get vertex position
+                    const worldPosition = vertex.clone().applyMatrix4(child.matrixWorld); // Convert to world coordinates
+                    const distance = worldPosition.distanceTo(camera.position); // Distance to camera
+                    minDistance = Math.min(minDistance, distance);
+                }
+
+                // Add the component to the array with the closest distance to the camera
+                componentDistances.push({ name: cleanedName, distance: minDistance, object: child });
+
+                console.log(`Object ${cleanedName} Closest Distance: ${minDistance.toFixed(2)} units`);
+            }
+        }
+    });
+
+    // Sort the components by their closest distance from the camera (ascending order)
+    componentDistances.sort((a, b) => b.distance - a.distance);
+
+    console.log('Sorted Components by Closest Distance from Camera:');
+    componentDistances.forEach((component, index) => {
+        console.log(`${index + 1}. ${component.name}: ${component.distance.toFixed(2)} units`);
+    });
+
+    // Set the min zoom value to the largest component distance
+    const largestDistance = componentDistances[0]?.distance || 0;
+    controls.minDistance = largestDistance;  // Set to largest visible distance
+    console.log(`Setting min zoom distance to: ${controls.minDistance}`);
+
+    // Pass componentDistances to updateZoomLimits
+    updateZoomLimits(componentDistances);
+
+    // Add "Toggle All Components" checkbox at the top
+    const toggleAllCheckbox = document.createElement('input');
+    toggleAllCheckbox.type = 'checkbox';
+    toggleAllCheckbox.checked = true;
+    toggleAllCheckbox.addEventListener('change', (event) => {
+        const isVisible = event.target.checked;
+        componentDistances.forEach((component) => {
+            toggleObjectVisibility(component.name, isVisible, componentDistances);
+        });
+    });
+
+    const toggleAllLabel = document.createElement('label');
+    toggleAllLabel.textContent = 'Toggle All Components';
+    toggleAllLabel.appendChild(toggleAllCheckbox);
+    componentList.appendChild(toggleAllLabel);
+
+    // Populate the component list with checkboxes, sorted by distance
+    componentDistances.forEach((component) => {
+        const listItem = document.createElement('li');
+        listItem.textContent = component.name;
+
+        const toggleCheckbox = document.createElement('input');
+        toggleCheckbox.type = 'checkbox';
+        toggleCheckbox.checked = true;
+        toggleCheckbox.addEventListener('change', (event) => {
+            toggleObjectVisibility(component.name, event.target.checked, componentDistances);
+        });
+
+        listItem.appendChild(toggleCheckbox);
+        componentList.appendChild(listItem);
+    });
+}
+
+// ui.js (or your appropriate UI handling file)
+
+export function closeInfoBox() {
+    const infoBox = document.getElementById('infoBox');
+    if (infoBox) {
+        infoBox.style.display = 'none'; // Hide the info box
+    }
+}
+File: index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Three.js App</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Sidebar styles */
+        #sidebar {
+            position: fixed;
+            left: -300px; /* Hidden initially */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            max-height: 80vh;
+            overflow-y: auto;
+            transition: left 0.3s ease-in-out;
+            overflow-x: hidden;
+        }
+
+        /* Active class to show sidebar */
+        #sidebar.active {
+            left: 10px;
+        }
+
+        /* Button to toggle sidebar */
+        #toggleSidebar {
+            position: fixed;
+            left: 10px;
+            top: 20px;
+            background: black;
+            color: white;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 100;
+        }
+
+        /* List item toggle effect */
+        .hidden-component {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Info Box styles */
+        #infoBox {
+            display: none;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.155.0/build/three.module.js",
+                "three/examples/jsm/loaders/GLTFLoader.js": "https://unpkg.com/three@0.155.0/examples/jsm/loaders/GLTFLoader.js",
+                "three/examples/jsm/loaders/DRACOLoader.js": "https://unpkg.com/three@0.155.0/examples/jsm/loaders/DRACOLoader.js",
+                "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.155.0/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- Button to toggle sidebar -->
+    <button id="toggleSidebar">☰ Components</button>
+
+    <!-- Sidebar for components -->
+    <div id="sidebar">
+        <h3>Component List</h3>
+        <ul id="componentList"></ul>
+    </div>
+
+    <!-- Info box for object descriptions -->
+    <div id="infoBox">
+        <p id="infoText">Description goes here</p>
+        <button id="closeButton">Close</button>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+    <script type="module">
+        import { closeInfoBox } from './ui.js';  // Import closeInfoBox function
+
+        // Add event listener for the close button
+        document.getElementById('closeButton').addEventListener('click', closeInfoBox);
+
+        // Toggle sidebar functionality
+        document.getElementById('toggleSidebar').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+    </script>
+
+</body>
+</html>
+File: scene.js
+
+import * as THREE from 'three';
+
+// Scene setup
+export const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe0e0e0);
+
+// Camera setup
+export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 2, 10);
+camera.lookAt(0, 0, 0);
+
+// Renderer setup
+export const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Lights
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+directionalLight.position.set(5, 10, 7.5);
+scene.add(directionalLight);
+File: controls.js
+
+// controls.js
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { camera } from './scene.js';
+import { renderer } from './scene.js';
+
+// Orbit controls setup
+export const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.minDistance = 0.005; // Minimum zoom distance, will be updated dynamically
+controls.maxDistance = 50; // Initial max distance
+
+// Function to update both min and max zoom distance based on visible objects
+// Accept componentDistances as an argument to update zoom limits dynamically
+// controls.js
+
+// Function to update both min and max zoom distance based on visible objects
+export function updateZoomLimits(componentDistances) {
+    if (!componentDistances || componentDistances.length === 0) return;
+
+    // Filter visible components
+    const visibleComponents = componentDistances.filter(component => component.object.visible);
+
+    // If no visible components, set minDistance to 0.005 as default
+    if (visibleComponents.length === 0) {
+        controls.minDistance = 0.005;
+    } else {
+        // Get the largest distance among visible components
+        const largestDistance = Math.max(...visibleComponents.map(component => component.distance));
+        controls.minDistance = largestDistance/700; // Set minDistance to largest visible distance
+    }
+
+    console.log('Updated Min Distance:', controls.minDistance);
+}
+
+
+// Function to ensure the camera is not zooming through the object
+export function updateZoomOnVisibilityChange(componentDistances) {
+    updateZoomLimits(componentDistances);  // Recalculate zoom limits when visibility changes
+}File: animate.js
+
+// animate.js
+import { renderer } from './renderer.js';
+import { scene } from './scene.js';
+import { camera } from './camera.js';
+import { controls } from './controls.js';
+export function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}File: light.js
+
+import * as THREE from 'three';
+import { scene } from './scene.js';
+
+// Ambient light should remain the same
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+scene.add(ambientLight);
+
+// Increase intensity for directional light and ensure it has a better position
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Increase intensity from 0.6 to 1
+directionalLight.position.set(5, 10, 7.5); // Keep this position or adjust as needed
+scene.add(directionalLight);
+File: main.js
+
+import { loadModel } from './modelLoader.js';
+import { setupUI } from './ui.js';
+import { setupRaycaster } from './raycaster.js';
+import { controls } from './controls.js';
+import { scene, renderer, camera } from './scene.js';
+import { updateZoomLimits } from './controls.js';  // Ensure this function is imported
+
+const descriptions = {
+    'BKLM': 'This part is part of the BKLM mechanism.',
+    'Mesh001': 'This is the main structure of the model.',
+    'Mesh023': 'This part connects various components.',
+    'physical_B4C': 'This is a physical component made of B4C.',
+    'ForwardEndplate': 'This is the forward end plate.',
+    'ECL': 'This part is an essential component of the ECL system.',
+};
+
+// Load the model
+// main.js
+
+// Load the model
+loadModel((model) => {
+    setupUI(model);
+    setupRaycaster(descriptions);
+
+    // Call updateZoomLimits immediately after loading the model
+    updateZoomLimits();  // This will initialize the zoom limits from the start
+});
+
+// Animation loop
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+File: camera.js
+
+import * as THREE from 'three';
+
+// Set up the camera position for better view of the model
+export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 2, 10);  // This should be an appropriate distance for your model
+camera.lookAt(0, 0, 0);         // Ensure the camera is looking at the center of the scene or model
+File: resize.js
+
+import { camera } from './scene.js';
+import { renderer } from './scene.js';
+
+export function resizeRenderer() {
+    const width = window.innerWidth;
+    const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+}
+
+window.addEventListener('resize', resizeRenderer);
+resizeRenderer();
+
+            These and multiple .js scripts that i have
+            merged for the purposes of giving to you only need to modify the relevant scripts not
+            everything. the purpose of the script is to display the model and make it interactable but currently it
+            fails to do that for the following reasons:
+
+        
